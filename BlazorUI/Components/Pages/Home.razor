@@ -1,0 +1,67 @@
+﻿@page "/"
+@using Application.Services
+@inject CalculationService CalculationService
+@inject IJSRuntime JsRuntime
+
+<PageTitle>RFM Processor</PageTitle>
+
+<h1>RFM Processor</h1>
+
+<FluentInputFile @ref="@_myFileByStream"
+                 AnchorId="MyUploadStream"
+                 DragDropZoneVisible="false"
+                 Mode="InputFileMode.Stream"
+                 Multiple="false"
+                 Accept=".xls, .xlsx"
+                 OnFileUploaded="@OnFileUploadedAsync"
+                 OnCompleted="@OnCompleted" />
+
+<FluentProgress Min="0" Max="100" Value="@_progressPercent" Visible="@(_progressPercent > 0)" />
+<FluentLabel Alignment="HorizontalAlignment.Center">
+    @_progressTitle
+</FluentLabel>
+
+<FluentButton Appearance="Appearance.Accent" Id="MyUploadStream">
+    Upload files
+</FluentButton>
+
+@code
+{
+    FluentInputFile? _myFileByStream = default!;
+    int? _progressPercent;
+    string? _progressTitle;
+
+    List<string> Files = new();
+
+    async Task OnFileUploadedAsync(FluentInputFileEventArgs file)
+    {
+        _progressPercent = file.ProgressPercent;
+        _progressTitle = file.ProgressTitle;
+
+        var localFile = Path.GetTempFileName() + file.Name;
+        Files.Add(localFile);
+        
+        await using FileStream fs = new(localFile, FileMode.Create);
+        await file.Stream!.CopyToAsync(fs);
+        await file.Stream!.DisposeAsync();
+    }
+
+    async void OnCompleted(IEnumerable<FluentInputFileEventArgs> files)
+    {
+        _progressPercent = _myFileByStream!.ProgressPercent;
+        _progressTitle = _myFileByStream!.ProgressTitle;
+
+        // For the demo, delete these files.
+        foreach (var file in Files)
+        {
+            var fileName = "Customer RFM Metrics.xlsx";
+            var stream = File.OpenRead(file);
+
+            await using Stream result = await CalculationService.CalculateMetrics(stream);
+            using var streamRef = new DotNetStreamReference(result);
+            await JsRuntime.InvokeVoidAsync("downloadFileFromStream", fileName, streamRef);
+            
+            File.Delete(file);
+        }
+    }
+}
