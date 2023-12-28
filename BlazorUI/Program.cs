@@ -11,6 +11,7 @@ builder.Services.AddRazorComponents()
 builder.Services.AddFluentUIComponents();
 
 builder.Services.AddSingleton<CalculationService>();
+builder.Services.AddSingleton<TemplateService>();
 
 WebApplication app = builder.Build();
 
